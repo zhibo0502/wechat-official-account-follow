@@ -1,0 +1,4 @@
+interface:
+  display_name: "WeChat Official Account Follow"
+  short_description: "Safely batch-follow exact WeChat official accounts"
+  default_prompt: "Use $wechat-official-account-follow to follow this governed list of WeChat official accounts in safe batches."
