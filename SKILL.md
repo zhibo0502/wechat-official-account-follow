@@ -1,44 +1,45 @@
 ---
 name: wechat-official-account-follow
-description: Batch-follow governed WeChat official-account lists through logged-in desktop WeChat with exact identity matching, action-time confirmation, CAPTCHA stop conditions, and verifiable coverage. Use for subscribing to public accounts or service accounts; do not use for article scraping, unfollowing, private contacts, or CAPTCHA bypass.
+description: 在已登录的桌面微信中，按一份精确确认的名单自动搜索并关注一批公众号。用于公众号批量订阅和逐项“已关注”核验；不用于文章抓取、取消关注、私人联系人操作或验证码绕过。
 ---
 
-# WeChat Official Account Follow
+# 微信公众号批量关注
 
-Turn a user-supplied public-account list into a verified subscription ledger.
+在正常路径中一次确认、连续执行；任何高风险或不确定状态都失败关闭。
 
-## Workflow
+## 执行流程
 
-1. Read the available Computer Use skill before controlling Windows. Use its supported Windows API only.
-2. Normalize and deduplicate the target list. For large lists, run `scripts/prepare_targets.py`; default to batches of at most 25.
-3. Inspect the logged-in desktop WeChat state without changing it. Count exact targets already followed when reliable readback is available.
-4. Present the imminent batch scope and request action-time confirmation immediately before the first Follow action. One confirmation may cover a clearly enumerated batch or full list.
-5. For each target:
-   - Search its exact public name.
-   - Accept an exact-name account card labeled 公众号, 服务号, or 订阅号.
-   - Open the profile and confirm its displayed identity before clicking Follow.
-   - Treat 已关注 as a successful no-op.
-   - Click Follow only within the confirmed scope, then refresh until 已关注 is visible.
-6. Stop the batch immediately on a CAPTCHA, robot check, frequency restriction, login failure, ambiguous identity, unexpected window, or unknown action outcome. Report the last proven account and do not retry the risky action blindly.
-7. Verify each completed batch. UI readback proves the Follow state; an approved read-only local identity adapter may additionally prove that the public identity landed in the client database.
-8. Report requested, newly followed, already followed, alias-mapped, unavailable, ambiguous, and verified counts separately.
+1. 以当前 `SKILL.md` 所在目录作为 skill 根目录。先读取宿主提供的桌面控制 skill：Windows 使用已验证的 Computer Use 路径；其他系统只有在适配器能观察并操作已登录的桌面微信时才继续，否则停止并报告 `unsupported_platform`。
+2. 用根目录下的 `scripts/prepare_targets.py` 规范化名单，设置 `--batch-size 25`，并把 `--output` 指向 skill 根目录之外的本次运行专用 JSON。不得手工跳过脚本校验。超过 25 个实际公众号时按输出批次连续执行，不在批次之间重复询问。
+3. 确认桌面微信已经登录，并且只有一个可明确定位的微信窗口。扫码和登录是用户动作。
+4. 第一次点击“关注”前，展示 `requested_count`、`target_count`、规范化名称和 `manifest_sha256`。长名单可展示完整输出文件路径与摘要，但必须让用户能检查精确名单。取得一次明确覆盖该清单的操作确认；用户最新消息只有在清单和摘要未改变时才能作为确认。
+5. 对每个输出目标自动执行：
+   - 用 `search_name` 精确搜索。
+   - 没有精确结果时记录为不可用并继续；出现多个无法区分的精确结果时按身份歧义停止。
+   - 只接受名称精确匹配且标注为公众号、服务号或订阅号的卡片。
+   - 打开资料页，再次核对显示身份。
+   - 已显示“已关注”则记录为既有关注，不点击。
+   - 否则点击“关注”，轮询到明确显示“已关注”后才记录成功。
+   - 关闭已完成资料页并继续下一项，不向用户逐项提问。
+6. 遇到验证码、机器人检测、频率限制、登录失败、身份歧义、异常窗口或动作结果未知时，立即停止整批。不得求解、规避或盲目重试。
+7. 最终一次性报告请求名称、实际公众号、别名映射、合并重复目标、新关注、已关注、不可用、身份歧义和剩余数量。
 
-## Identity rules
+遇到别名判定、文章发布者恢复、中止记录或断点恢复时，读取 `references/verification.md`；普通精确匹配路径不需要加载该文件。
 
-- Similar names are different accounts. Never choose by logo, popularity, or search rank alone.
-- An alias is valid only when current evidence connects the configured name to the actual account. Open the profile and verify the operator or official description. Record both names.
-- If search exposes only an official article, open it read-only and inspect the publisher link. Follow only when that publisher is the intended target; promotional text mentioning another account is not identity evidence.
-- A video channel is not a substitute for a public account unless the user explicitly changes the target type.
+## 身份与授权规则
 
-Read [references/verification.md](references/verification.md) when aliases, article-to-profile recovery, database readback, or failure recovery is needed.
+- 相似名称是不同账号。不得只按头像、热度或搜索排序选择。
+- 只有用户明确提供改名，或搜索账号群组与资料页运营主体共同证明同一组织时，才可使用不同实际名称。
+- 搜索只出现官方文章时，可核查文章发布者；仅当发布者就是目标账号时才能关注，推广文案不是身份依据。
+- 视频号不是公众号替代品，除非用户明确改变目标类型。
+- 名单准备或研究授权不等于关注授权。清单内容或 `manifest_sha256` 改变后，原确认立即失效。
 
-## Boundaries
+## 安全边界
 
-- Keep private contacts, chats, cookies, tokens, database keys, local paths, and account identifiers out of logs and published artifacts.
-- Use normal WeChat UI behavior. CAPTCHA solving, fingerprint spoofing, stealth browsers, and rate-limit evasion are outside this skill.
-- Following changes the user's account subscription state. Authorization for research or list preparation does not authorize Follow actions.
-- Do not change the source list or replace an unavailable target unless the user supplies the replacement or current first-party evidence proves a rename.
+- 不把联系人、聊天、Cookie、Token、本地私密路径或账号标识写入日志和发布产物。
+- 只使用正常微信界面。验证码求解、指纹伪装、隐身浏览器和限流规避不属于本 Skill。
+- 不擅自更改名单或替换不可用目标；只有用户提供替代项或当前一方证据证明改名时才调整，并重新生成、确认清单。
 
-## Completion
+## 完成定义
 
-Complete only when every target is classified and every claimed subscription has a visible 已关注 readback or stronger approved evidence. A partial run must name every unresolved target and its exact stopping reason.
+每个实际公众号都被分类，且每个声称成功的订阅都有可见“已关注”回读，才算完成。部分运行必须指出第一个未解决目标、精确停止原因和未触碰余量。

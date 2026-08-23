@@ -1,45 +1,47 @@
-# Verification and recovery
+# 例外验证与恢复
 
-Read this reference only when the ordinary exact-name profile flow is insufficient.
+只在出现别名、搜索结果缺失、异常中止或恢复运行时读取本文件。
 
-## Evidence levels
+## 证据层级
 
-Use the strongest available label without overstating it:
+- `searched`：执行过精确搜索，不代表找到正确账号。
+- `profile_verified`：名称、账号类型及资料页身份一致。
+- `ui_followed`：当前资料页明确显示“已关注”，是本 Skill 唯一成功依据。
 
-- `searched`: an exact account card was returned.
-- `profile_verified`: the opened profile identity matched the target.
-- `ui_followed`: the profile refreshed to `已关注`.
-- `database_verified`: an approved read-only adapter resolved the requested public name to one `gh_...` identity after the UI action.
+不要把点击成功、页面关闭或搜索卡片存在当成 `ui_followed`。
 
-Database verification is optional. It must be bounded to requested public names, read-only, secret-free, and fail closed on missing or multiple identities. Never publish raw database material, keys, private contacts, chats, or unrelated account names.
+## 别名和改名
 
-## Alias evidence
+别名只能来自以下证据之一：
 
-Record an alias only when one of these paths is current and unambiguous:
+1. 用户明确给出的旧名到现名映射；
+2. 微信搜索结果中的账号群组，加上资料页运营主体，能够共同证明是同一组织；
+3. 目标的官方文章发布者明确指向现名账号。
 
-1. Search groups the configured name under an account card whose actual name differs, and the profile operator or description matches the intended organization.
-2. An official article for the configured name exposes a publisher link whose profile identifies the intended organization.
-3. The user explicitly states the replacement account, and current profile or database readback confirms it is already followed.
+将确认后的映射写入别名 JSON，重新运行准备脚本。不得在界面循环中临时换名；重新生成后摘要改变，必须重新取得整单确认。
 
-Store `configured_name`, `actual_name`, evidence level, and a short public reason. Apply the mapping only to that target.
+## 从文章恢复公众号
 
-## Article-to-profile recovery
+搜索没有公众号卡片但出现官方文章时：
 
-When no account card exists:
+1. 打开文章并检查发布者名称；
+2. 从发布者入口进入资料页；
+3. 核对公众号类型、精确名称和运营主体；
+4. 证据不完整则记为 `ambiguous` 并停止，不按文章正文中的推广名称关注。
 
-1. Open a clearly first-party article without clicking Follow.
-2. Inspect the article publisher link, not promotional text in the body.
-3. If the publisher is the intended account, open its profile and resume the normal profile verification flow.
-4. If the article promotes another account but is published by a different account, stop. The publisher Follow button belongs to the publisher.
+## 中止记录
 
-## Stop ledger
+停止时记录不含隐私信息的最小检查点：
 
-On a stop condition, retain:
+- 清单的 `manifest_sha256`；
+- 最后一个 `ui_followed` 目标；
+- 当前目标和阶段；
+- 停止原因；
+- 已完成与未触碰数量；
+- 当前动作结果是否已知。
 
-- last fully verified target;
-- current target and stage;
-- exact visible reason;
-- completed batch counts;
-- whether the last action outcome is known.
+## 恢复
 
-Resume from the first unverified target after the user resolves login or CAPTCHA state. Re-observe the window and never reuse old coordinates or accessibility indexes.
+恢复前重新核对运行清单摘要和当前微信窗口。若摘要改变，重新确认整单。然后从第一个未验证目标开始，并重新观察搜索框、结果和资料页；不得复用旧截图坐标或假定中止前的点击已经生效。
+
+非 Windows 环境还必须重新确认桌面适配器能读取微信窗口语义并可靠点击。仅能截图、无法确定控件或无法验证“已关注”时，报告 `unsupported_platform`，不要降级为坐标盲点。
